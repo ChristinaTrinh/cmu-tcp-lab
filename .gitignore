@@ -1,0 +1,5 @@
+results/
+handin.tar.gz
+__pycache__/
+*.pyc
+.vagrant/
