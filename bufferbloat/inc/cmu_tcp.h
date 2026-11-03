@@ -129,6 +129,7 @@ typedef struct
 
 	uint64_t base_rtt_us;
 	uint64_t latest_rtt_us;
+	uint32_t high_rtt_count;
 } cmu_socket_t;
 
 /*

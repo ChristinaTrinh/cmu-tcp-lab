@@ -565,10 +565,37 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt)
 
 			uint64_t sample_rtt_us = now_us() - sent_ts;
 
-			if (sock->base_rtt_us == 0 ||
-				sample_rtt_us < sock->base_rtt_us)
+			if (sock->base_rtt_us == 0)
 			{
 				sock->base_rtt_us = sample_rtt_us;
+				sock->high_rtt_count = 0;
+			}
+			else if (sample_rtt_us < sock->base_rtt_us)
+			{
+				// Found a better empty-path RTT
+				sock->base_rtt_us = sample_rtt_us;
+				sock->high_rtt_count = 0;
+			}
+			else
+			{
+				/*
+				 * If RTT stays much higher than the old baseline for several ACKs,
+				 * assume the path itself changed rather than the queue staying full.
+				 */
+				if (sample_rtt_us > sock->base_rtt_us * 3 / 2)
+				{
+					sock->high_rtt_count++;
+				}
+				else
+				{
+					sock->high_rtt_count = 0;
+				}
+
+				if (sock->high_rtt_count >= 5)
+				{
+					sock->base_rtt_us = sample_rtt_us;
+					sock->high_rtt_count = 0;
+				}
 			}
 
 			sock->latest_rtt_us = sample_rtt_us;
