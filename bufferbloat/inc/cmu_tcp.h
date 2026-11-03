@@ -27,93 +27,108 @@
 #define EXIT_ERROR -1
 #define EXIT_FAILURE 1
 
-typedef enum {
-  CONN_CLOSED,
-  CONN_LISTEN,
-  CONN_SYN_SENT,
-  CONN_SYN_RCVD,
-  CONN_ESTABLISHED,
+typedef enum
+{
+	CONN_CLOSED,
+	CONN_LISTEN,
+	CONN_SYN_SENT,
+	CONN_SYN_RCVD,
+	CONN_ESTABLISHED,
 
-  CONN_CLIENT_FIN_SENT,
-  CONN_SERVER_FIN_SENT,
-  CONN_FIN_WAIT,
-  CONN_HALF_TERM,
-  CONN_TERM
+	CONN_CLIENT_FIN_SENT,
+	CONN_SERVER_FIN_SENT,
+	CONN_FIN_WAIT,
+	CONN_HALF_TERM,
+	CONN_TERM
 } conn_state_t;
 
-typedef enum { SLOW_START, FAST_RECOVERY, CONGEST_AVOID } congest_state_t;
+typedef enum
+{
+	SLOW_START,
+	FAST_RECOVERY,
+	CONGEST_AVOID
+} congest_state_t;
 
-typedef struct {
-  uint32_t next_seq_expected;
-  uint32_t last_ack_received;
+typedef struct
+{
+	uint32_t next_seq_expected;
+	uint32_t last_ack_received;
 } window_t;
 
 /**
  * CMU-TCP socket types. (DO NOT CHANGE.)
  */
-typedef enum {
-  TCP_INITIATOR = 0,
-  TCP_LISTENER = 1,
+typedef enum
+{
+	TCP_INITIATOR = 0,
+	TCP_LISTENER = 1,
 } cmu_socket_type_t;
 
 // DONT CHANGE
-typedef struct {
-  uint8_t* msg;
-  uint16_t plen;
-  uint32_t seq;
-  uint16_t payload_len;
+typedef struct
+{
+	uint8_t *msg;
+	uint16_t plen;
+	uint32_t seq;
+	uint16_t payload_len;
 } unacked_packet_t;
 
-typedef struct unacked_node {
-  unacked_packet_t pkt;
-  struct unacked_node* next;
+typedef struct unacked_node
+{
+	unacked_packet_t pkt;
+	struct unacked_node *next;
 } unacked_node_t;
 
-typedef struct {
-  unacked_node_t* head;  // oldest unacked packet (lowest seq)
-  unacked_node_t* tail;  // newest sent packet (append here)
-  int count;
+typedef struct
+{
+	unacked_node_t *head; // oldest unacked packet (lowest seq)
+	unacked_node_t *tail; // newest sent packet (append here)
+	int count;
 } unacked_packet_queue_t;
 
 /**
  * This structure holds the state of a socket. You may modify this structure as
  * you see fit to include any additional state you need for your implementation.
  */
-typedef struct {
-  int socket;
-  pthread_t thread_id;
-  uint16_t my_port;
-  struct sockaddr_in conn;
-  uint8_t* received_buf;
-  int received_len;
-  pthread_mutex_t recv_lock;
-  pthread_cond_t wait_cond;
-  uint8_t* sending_buf;
-  int sending_len;
-  cmu_socket_type_t type;
-  pthread_mutex_t send_lock;
-  int dying;
-  pthread_mutex_t death_lock;
-  window_t window;
-  conn_state_t handshake_state;
-  struct timespec last_send_time;
-  uint32_t my_isn;
-  uint32_t peer_isn;
-  uint32_t fin_seq;
-  // CP2
-  uint32_t cwnd;
-  uint32_t ssthresh;
-  congest_state_t congest_state;
-  uint8_t dupACKcount;
-  uint16_t adv_window;              // Peer advertised window
-  struct timespec retransmit_time;  // Timestamp of oldest unacked packet
-  uint32_t buffered_bytes;          // Buffered byte count for receiver
-  unacked_packet_queue_t unacked_packet_queue;
-  uint32_t next_seq_to_send;
-  uint8_t in_recovery;     // 1 while resending data lost in the last loss event
-  uint32_t recover;        // next_seq_to_send when the loss was detected
-  uint32_t rexmit_next;    // lowest seq not yet resent during this recovery
-  uint16_t last_adv_sent;  // window we last advertised to the peer
+typedef struct
+{
+	int socket;
+	pthread_t thread_id;
+	uint16_t my_port;
+	struct sockaddr_in conn;
+	uint8_t *received_buf;
+	int received_len;
+	pthread_mutex_t recv_lock;
+	pthread_cond_t wait_cond;
+	uint8_t *sending_buf;
+	int sending_len;
+	cmu_socket_type_t type;
+	pthread_mutex_t send_lock;
+	int dying;
+	pthread_mutex_t death_lock;
+	window_t window;
+	conn_state_t handshake_state;
+	struct timespec last_send_time;
+	uint32_t my_isn;
+	uint32_t peer_isn;
+	uint32_t fin_seq;
+	// CP2
+	uint32_t cwnd;
+	uint32_t ssthresh;
+	congest_state_t congest_state;
+	uint8_t dupACKcount;
+	uint16_t adv_window;			 // Peer advertised window
+	struct timespec retransmit_time; // Timestamp of oldest unacked packet
+	uint32_t buffered_bytes;		 // Buffered byte count for receiver
+	unacked_packet_queue_t unacked_packet_queue;
+	uint32_t next_seq_to_send;
+	uint8_t in_recovery;	// 1 while resending data lost in the last loss event
+	uint32_t recover;		// next_seq_to_send when the loss was detected
+	uint32_t rexmit_next;	// lowest seq not yet resent during this recovery
+	uint16_t last_adv_sent; // window we last advertised to the peer
+
+	uint64_t base_rtt_us;
+	uint64_t latest_rtt_us;
 } cmu_socket_t;
 
 /*
@@ -123,10 +138,11 @@ typedef struct {
 /**
  * Read mode flags supported by a CMU-TCP socket.
  */
-typedef enum {
-  NO_FLAG = 0,  // Default behavior: block indefinitely until data is available.
-  NO_WAIT,      // Return immediately if no data is available.
-  TIMEOUT,      // Block until data is available or the timeout is reached.
+typedef enum
+{
+	NO_FLAG = 0, // Default behavior: block indefinitely until data is available.
+	NO_WAIT,	 // Return immediately if no data is available.
+	TIMEOUT,	 // Block until data is available or the timeout is reached.
 } cmu_read_mode_t;
 
 /**
@@ -143,8 +159,8 @@ typedef enum {
  *
  * @return 0 on success, -1 on error.
  */
-int cmu_socket(cmu_socket_t* sock, const cmu_socket_type_t socket_type,
-               const int port, const char* server_ip);
+int cmu_socket(cmu_socket_t *sock, const cmu_socket_type_t socket_type,
+			   const int port, const char *server_ip);
 
 /**
  * Closes a CMU-TCP socket.
@@ -153,7 +169,7 @@ int cmu_socket(cmu_socket_t* sock, const cmu_socket_type_t socket_type,
  *
  * @return 0 on success, -1 on error.
  */
-int cmu_close(cmu_socket_t* sock);
+int cmu_close(cmu_socket_t *sock);
 
 /**
  * Reads data from a CMU-TCP socket.
@@ -170,8 +186,8 @@ int cmu_close(cmu_socket_t* sock);
  *
  * @return The number of bytes read on success, -1 on error.
  */
-int cmu_read(cmu_socket_t* sock, void* buf, const int length,
-             cmu_read_mode_t flags);
+int cmu_read(cmu_socket_t *sock, void *buf, const int length,
+			 cmu_read_mode_t flags);
 
 /**
  * Writes data to a CMU-TCP socket.
@@ -182,12 +198,12 @@ int cmu_read(cmu_socket_t* sock, void* buf, const int length,
  *
  * @return 0 on success, -1 on error.
  */
-int cmu_write(cmu_socket_t* sock, const void* buf, int length);
+int cmu_write(cmu_socket_t *sock, const void *buf, int length);
 
 /*
  * You can declare more functions after this point if you need to.
  */
 
-void log_cwnd(cmu_socket_t* sock);
+void log_cwnd(cmu_socket_t *sock);
 
-#endif  // PROJECT_2_15_441_INC_CMU_TCP_H_
+#endif // PROJECT_2_15_441_INC_CMU_TCP_H_
