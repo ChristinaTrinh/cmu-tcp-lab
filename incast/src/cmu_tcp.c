@@ -92,6 +92,8 @@ int cmu_socket(cmu_socket_t* sock, const cmu_socket_type_t socket_type,
   sock->recover = 0;
   sock->rexmit_next = 0;
   sock->last_adv_sent = MAX_NETWORK_BUFFER;
+  sock->last_host_ver = 0;
+  memset(&sock->last_win_check, 0, sizeof(sock->last_win_check));
 
   memset(&sock->last_send_time, 0, sizeof(sock->last_send_time));
 

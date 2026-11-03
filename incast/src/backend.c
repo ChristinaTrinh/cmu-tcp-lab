@@ -16,6 +16,7 @@
  */
 
 #include "backend.h"
+#include "lab_host.h"
 
 #include <poll.h>
 #include <stdbool.h>
@@ -37,6 +38,34 @@
 #define DATA_IGNORED 2
 #define DATA_ERROR -1
 
+#define K_HEADROOM_PKTS 4
+
+static uint16_t compute_adv_window(cmu_socket_t* sock) {
+  uint32_t space = MAX_NETWORK_BUFFER - sock->buffered_bytes;
+
+  // Workers keep the old behavior.
+  if (sock->type != TCP_LISTENER) {
+    return (uint16_t)space;
+  }
+  int n = lab_host_active();
+  int rank = lab_host_rank(sock);
+  if (n <= 0 || rank < 0) {
+    return (uint16_t)MIN(space, (uint32_t)MSS);
+  }
+  // Total bytes the network can hold: one BDP plus a little queue headroom
+  double bdp = lab_host_link_bps() / 8.0 * (lab_host_base_rtt_us() / 1e6);
+  uint32_t budget = (uint32_t)bdp + K_HEADROOM_PKTS * MSS;
+  uint32_t grant;
+  uint32_t share = budget / n;
+  if (share >= MSS) {
+    grant = (share / MSS) * MSS;
+  } else {
+    uint32_t slots = budget / MSS;
+    grant = ((uint32_t)rank < slots) ? MSS : 0;
+  }
+  return (uint16_t)MIN(grant, space);
+}
+
 // how many milliseconds have passed since the input time
 static long ms_since(const struct timespec* start) {
   struct timespec now;
@@ -50,7 +79,8 @@ static long ms_since(const struct timespec* start) {
 static int send_ctrl_packet(cmu_socket_t* sock, uint32_t seq, uint32_t ack,
                             uint8_t flags) {
   uint16_t hlen = sizeof(cmu_tcp_header_t);
-  uint16_t adv_window = MAX_NETWORK_BUFFER - sock->buffered_bytes;
+  // uint16_t adv_window = MAX_NETWORK_BUFFER - sock->buffered_bytes;
+  uint16_t adv_window = compute_adv_window(sock);
   sock->last_adv_sent = adv_window;
   uint8_t* pkt =
       create_packet(sock->my_port, ntohs(sock->conn.sin_port), seq, ack, hlen,
@@ -524,10 +554,22 @@ static void maybe_send_window_update(cmu_socket_t* sock) {
   if (sock->handshake_state == CONN_ESTABLISHED ||
       sock->handshake_state == CONN_HALF_TERM ||
       sock->handshake_state == CONN_FIN_WAIT) {
-    uint32_t cur = MAX_NETWORK_BUFFER - sock->buffered_bytes;
-    if (sock->last_adv_sent < MSS && cur >= MSS) {
-      send_ctrl_packet(sock, sock->window.last_ack_received,
-                       sock->window.next_seq_expected, ACK_FLAG_MASK);
+    bool check = true;
+    if (sock->type == TCP_LISTENER) {
+      unsigned v = lab_host_version();
+      check = (v != sock->last_host_ver) || ms_since(&sock->last_win_check) >= 1;
+      if (check) {
+        sock->last_host_ver = v;
+        clock_gettime(CLOCK_MONOTONIC, &sock->last_win_check);
+      }
+    }
+    if (check) {
+      uint16_t cur = compute_adv_window(sock);
+      uint16_t last = sock->last_adv_sent;
+      int diff = cur > last ? cur - last : last - cur;
+      if (diff >= MSS || ((last < MSS) != (cur < MSS))) {
+        send_ctrl_packet(sock, sock->window.last_ack_received, sock->window.next_seq_expected, ACK_FLAG_MASK);
+      }
     }
   }
   pthread_mutex_unlock(&(sock->recv_lock));
