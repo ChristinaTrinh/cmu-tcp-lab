@@ -114,6 +114,9 @@ typedef struct {
   uint32_t recover;        // next_seq_to_send when the loss was detected
   uint32_t rexmit_next;    // lowest seq not yet resent during this recovery
   uint16_t last_adv_sent;  // window we last advertised to the peer
+  // Incast
+  unsigned last_host_ver;
+  struct timespec last_win_check;
 } cmu_socket_t;
 
 /*
