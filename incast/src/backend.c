@@ -38,7 +38,8 @@
 #define DATA_IGNORED 2
 #define DATA_ERROR -1
 
-#define K_HEADROOM_PKTS 4
+#define K_HEADROOM_PKTS 2
+#define INITIAL_SLOTS 6
 
 static uint16_t compute_adv_window(cmu_socket_t* sock) {
   uint32_t space = MAX_NETWORK_BUFFER - sock->buffered_bytes;
@@ -61,6 +62,9 @@ static uint16_t compute_adv_window(cmu_socket_t* sock) {
     grant = (share / MSS) * MSS;
   } else {
     uint32_t slots = budget / MSS;
+    if (lab_host_arrival_bps() == 0.0) {
+      slots = MIN(slots, INITIAL_SLOTS);
+    }
     grant = ((uint32_t)rank < slots) ? MSS : 0;
   }
   return (uint16_t)MIN(grant, space);
