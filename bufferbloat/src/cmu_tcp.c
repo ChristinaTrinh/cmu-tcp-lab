@@ -101,6 +101,9 @@ int cmu_socket(cmu_socket_t *sock, const cmu_socket_type_t socket_type,
 	sock->base_rtt_us = 0;
 	sock->latest_rtt_us = 0;
 	sock->high_rtt_count = 0;
+	sock->last_ack_time_us = 0;
+	sock->base_ack_gap_us = 0;
+	sock->latest_ack_gap_us = 0;
 
 	memset(&sock->last_send_time, 0, sizeof(sock->last_send_time));
 

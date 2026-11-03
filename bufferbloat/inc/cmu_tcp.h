@@ -130,6 +130,9 @@ typedef struct
 	uint64_t base_rtt_us;
 	uint64_t latest_rtt_us;
 	uint32_t high_rtt_count;
+	uint64_t last_ack_time_us;
+	uint64_t base_ack_gap_us;
+	uint64_t latest_ack_gap_us;
 } cmu_socket_t;
 
 /*

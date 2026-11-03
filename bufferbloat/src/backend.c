@@ -578,11 +578,15 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt)
 			}
 			else
 			{
-				/*
-				 * If RTT stays much higher than the old baseline for several ACKs,
-				 * assume the path itself changed rather than the queue staying full.
-				 */
-				if (sample_rtt_us > sock->base_rtt_us * 3 / 2)
+				bool rtt_much_higher =
+					sample_rtt_us > sock->base_rtt_us * 3 / 2;
+
+				bool ack_rate_similar =
+					sock->base_ack_gap_us > 0 &&
+					sock->latest_ack_gap_us <
+						sock->base_ack_gap_us * 3 / 2;
+
+				if (rtt_much_higher && ack_rate_similar)
 				{
 					sock->high_rtt_count++;
 				}
@@ -626,6 +630,24 @@ void handle_message(cmu_socket_t *sock, uint8_t *pkt)
 				{
 					clock_gettime(CLOCK_MONOTONIC, &sock->retransmit_time);
 				}
+				// Measure spacing between NEW ACKs
+				uint64_t now = now_us();
+
+				if (sock->last_ack_time_us != 0)
+				{
+					uint64_t gap =
+						now - sock->last_ack_time_us;
+
+					sock->latest_ack_gap_us = gap;
+
+					if (sock->base_ack_gap_us == 0 ||
+						gap < sock->base_ack_gap_us)
+					{
+						sock->base_ack_gap_us = gap;
+					}
+				}
+
+				sock->last_ack_time_us = now;
 				tcp_reno(sock, true);
 				if (sock->in_recovery)
 				{
